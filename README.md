@@ -2,4 +2,4 @@
 
 ## Live Demo
 
-[https://snowbellsan.github.io/sudoku/](https://snowbellsan.github.io/sudoku/)
+[ここから実行](https://snowbellsan.github.io/sudoku/)
