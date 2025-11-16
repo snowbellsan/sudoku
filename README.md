@@ -2,6 +2,8 @@
 
 一応難易度選択機能がついてます。
 
+広告とか何にも出ないので、気軽にプレイできます。
+
 ## Live Demo
 
 [ここから実行](https://snowbellsan.github.io/sudoku/)
