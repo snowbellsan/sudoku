@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数独パズル 完全版</title>
+<style>
+/* ============================================================
+ * 1. ベーススタイルとモバイルフレンドリーな設定
+ * ============================================================ */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+    min-height: 100vh;
+    padding: 10px;
+    padding-bottom: 20px;
+}
+
+h2 {
+    margin: 15px 0;
+    color: #1565c0;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+    font-size: 1.8em;
+}
+
+/* ============================================================
+ * 2. 統計情報 (Stats) - 時間表示
+ * ============================================================ */
+#stats {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    max-width: 450px;
+    margin-bottom: 15px;
+    font-size: 1.2em; 
+    padding: 12px 0;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+    color: #1565c0;
+    font-weight: 600;
+}
+
+#stats div {
+    padding: 0 20px;
+}
+
+/* ============================================================
+ * 3. 数独グリッド (Grid)
+ * ============================================================ */
+#grid {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr);
+    width: 90vw;
+    max-width: 450px;
+    aspect-ratio: 1 / 1;
+    border: 3px solid #1565c0;
+    margin-bottom: 20px;
+    background-color: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-radius: 4px;
+}
+
+.cell {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 2.0em;
+    border: 1px solid #ccc;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    transition: background-color 0.2s;
+}
+
+/* 3x3ブロックの太線 */
+.cell[data-r="2"],
+.cell[data-r="5"] { 
+    border-bottom: 2px solid #1565c0; 
+}
+
+.cell[data-c="2"],
+.cell[data-c="5"] { 
+    border-right: 2px solid #1565c0; 
+}
+
+/* 選択中のセル */
+.cell.selected {
+    background-color: #b3e5fc !important;
+    border-color: #0288d1;
+    box-shadow: 0 0 8px rgba(2, 136, 209, 0.6);
+}
+
+/* 関連セル (行・列・ブロック) のハイライト */
+.cell.highlighted {
+    background-color: #e1f5fe;
+}
+
+/* ヒント（固定値）のスタイル */
+.cell.fixed {
+    background-color: #f5f5f5;
+    font-weight: bold;
+    color: #424242;
+}
+
+/* ユーザー入力値のスタイル */
+.cell:not(.fixed) {
+    color: #1976d2;
+    font-weight: 500;
+}
+
+/* エラー（重複）のスタイル */
+.cell.error {
+    background-color: #ffcdd2 !important;
+    color: #c62828 !important;
+    font-weight: 600;
+}
+
+/* メモ数字のコンテナ */
+.memo-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    width: 100%;
+    height: 100%;
+    font-size: 0.5em; 
+    line-height: 1;
+    color: #757575;
+    opacity: 0.8;
+}
+
+.memo-container span {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: normal;
+}
+
+/* ============================================================
+ * 4. コントロールとキーパッド (Controls & Keypad)
+ * ============================================================ */
+#controls {
+    margin: 0 0 15px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    max-width: 450px;
+}
+
+#controls label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: #424242;
+}
+
+#controls select {
+    padding: 8px 12px;
+    font-size: 16px;
+    border: 2px solid #90caf9;
+    border-radius: 5px;
+    background-color: #fff;
+    color: #1565c0;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+#controls select:hover {
+    border-color: #42a5f5;
+}
+
+button {
+    padding: 10px 16px;
+    font-size: 16px;
+    cursor: pointer;
+    border: 2px solid #1976d2;
+    background: #1976d2;
+    color: white;
+    border-radius: 5px;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    font-weight: 500;
+}
+
+button:hover:not(:disabled) {
+    background: #1565c0;
+    border-color: #1565c0;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+}
+
+button:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#controls button {
+    background: #757575;
+    border-color: #757575;
+}
+
+#controls button:hover:not(:disabled) {
+    background: #616161;
+    border-color: #616161;
+}
+
+#keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr) 1fr 1fr;
+    grid-template-rows: repeat(3, 1fr);
+    gap: 8px;
+    width: 90vw;
+    max-width: 450px;
+    padding: 15px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+#keypad button {
+    width: 100%;
+    height: 60px;
+    font-size: 2.0em;
+    padding: 0;
+    background-color: #fff;
+    color: #1565c0;
+    border: 2px solid #90caf9;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#keypad button:hover:not(:disabled) {
+    background-color: #e3f2fd;
+    border-color: #42a5f5;
+}
+
+#memo-toggle {
+    font-size: 0.55em;
+    background-color: #ff9800;
+    color: white;
+    border-color: #ff9800;
+    font-weight: 600;
+    line-height: 0.8;
+    grid-column: 4;
+    grid-row: 1 / 3;
+}
+
+#memo-toggle:hover:not(:disabled) {
+    background-color: #f57c00;
+    border-color: #f57c00;
+}
+
+.memo-mode-active {
+    background-color: #4caf50 !important;
+    color: white !important;
+    border-color: #4caf50 !important;
+}
+
+.memo-mode-active:hover:not(:disabled) {
+    background-color: #388e3c !important;
+    border-color: #388e3c !important;
+}
+
+.keypad-clear {
+    font-size: 0.7em;
+    background-color: #f44336 !important;
+    color: white !important;
+    border-color: #f44336 !important;
+    font-weight: 600;
+    grid-column: 5;
+    grid-row: 1 / 3;
+}
+
+.keypad-clear:hover:not(:disabled) {
+    background-color: #d32f2f !important;
+    border-color: #d32f2f !important;
+}
+
+/* ============================================================
+ * 5. レスポンシブデザイン
+ * ============================================================ */
+@media (min-width: 600px) {
+    body {
+        padding: 20px;
+    }
+    
+    h2 {
+        font-size: 2em;
+    }
+    
+    #grid, #stats, #controls, #keypad {
+        width: 450px;
+    }
+}
+
+@media (max-width: 400px) {
+    h2 {
+        font-size: 1.5em;
+    }
+    
+    #stats {
+        font-size: 1em;
+    }
+    
+    #keypad button {
+        height: 50px;
+        font-size: 1.8em;
+    }
+}
+</style>
+</head>
+<body>
+
+<h2>🎯 数独パズル</h2>
+
+<div id="stats">
+    <div>⏳ 時間: <span id="time">00:00</span></div>
+</div>
+
+<div id="grid"></div>
+
+<div id="controls">
+    <label>手がかり数:
+        <select id="clues">
+            <option value="36">36（やさしい）</option>
+            <option value="30">30（ふつう）</option>
+            <option value="24" selected>24（むずかしい）</option>
+            <option value="20">20（超難問）</option>
+        </select>
+    </label>
+    <button onclick="generatePuzzle()">🔄 生成</button>
+    <button onclick="confirmGiveUp()">🏳️ ギブアップ</button> 
+    <button onclick="resetPuzzle()">↩️ リセット</button>
+    <button onclick="undo()">⬅️ 元に戻す</button>
+</div>
+
+<div id="keypad">
+    <button onclick="handleKeypadInput(1)">1</button>
+    <button onclick="handleKeypadInput(2)">2</button>
+    <button onclick="handleKeypadInput(3)">3</button>
+    <button id="memo-toggle" onclick="toggleMemoMode()">メモ<br>(OFF)</button>
+    <button class="keypad-clear" onclick="handleKeypadInput(0)">消去</button>
+    
+    <button onclick="handleKeypadInput(4)">4</button>
+    <button onclick="handleKeypadInput(5)">5</button>
+    <button onclick="handleKeypadInput(6)">6</button>
+    
+    <button onclick="handleKeypadInput(7)">7</button>
+    <button onclick="handleKeypadInput(8)">8</button>
+    <button onclick="handleKeypadInput(9)">9</button>
+</div>
+
+<script>
+// ============================================================
+// 定数と状態管理
+// ============================================================
+const SIZE = 9;
+const CELL_COUNT = 81;
+const gridElement = document.getElementById("grid");
+const timeElement = document.getElementById("time");
+const memoToggleButton = document.getElementById("memo-toggle");
+
+let solutionGrid = [];
+let initialPuzzle = [];
+let selectedCell = null;
+
+let timerInterval = null;
+let seconds = 0;
+let isMemoMode = false;
+
+// Undo機能のための履歴スタック
+let history = []; 
+const MAX_HISTORY = 50; 
+
+// ============================================================
+// 数独コアアルゴリズム
+// ============================================================
+
+function createEmptyGrid() {
+    return Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+}
+
+function getGridValuesFromCells() {
+    let grid = createEmptyGrid();
+    for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+            const cell = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+            grid[r][c] = parseInt(cell.dataset.value || "0");
+        }
+    }
+    return grid;
+}
+
+function isValid(grid, r, c, val) {
+    if (val === 0) return true;
+    
+    // 行のチェック
+    for (let x = 0; x < SIZE; x++) {
+        if (x !== c && grid[r][x] === val) return false;
+    }
+    
+    // 列のチェック
+    for (let y = 0; y < SIZE; y++) {
+        if (y !== r && grid[y][c] === val) return false;
+    }
+    
+    // 3x3ブロックのチェック
+    const br = Math.floor(r / 3) * 3;
+    const bc = Math.floor(c / 3) * 3;
+    for (let y = br; y < br + 3; y++) {
+        for (let x = bc; x < bc + 3; x++) {
+            if ((y !== r || x !== c) && grid[y][x] === val) return false;
+        }
+    }
+    
+    return true;
+}
+
+function findEmpty(grid) {
+    for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+            if (grid[r][c] === 0) return [r, c];
+        }
+    }
+    return null;
+}
+
+function fillGrid(grid) {
+    const pos = findEmpty(grid);
+    if (!pos) return true;
+    
+    const [r, c] = pos;
+    const nums = [...Array(SIZE).keys()].map(n => n + 1);
+    shuffle(nums);
+    
+    for (const n of nums) {
+        if (isValid(grid, r, c, n)) {
+            grid[r][c] = n;
+            if (fillGrid(grid)) return true;
+            grid[r][c] = 0;
+        }
+    }
+    return false;
+}
+
+function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+}
+
+function countSolutions(grid) {
+    const pos = findEmpty(grid);
+    if (!pos) return 1;
+    
+    const [r, c] = pos;
+    let count = 0;
+    
+    for (let n = 1; n <= SIZE; n++) {
+        if (isValid(grid, r, c, n)) {
+            grid[r][c] = n;
+            count += countSolutions(grid);
+            grid[r][c] = 0;
+            if (count >= 2) return count;
+        }
+    }
+    return count;
+}
+
+function generateSudoku(clues) {
+    // 完全な解を生成
+    let fullGrid = createEmptyGrid();
+    fillGrid(fullGrid);
+    solutionGrid = JSON.parse(JSON.stringify(fullGrid));
+
+    // セルをランダムに削除してパズルを作成
+    let puzzle = JSON.parse(JSON.stringify(fullGrid));
+    let cells = [];
+    for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+            cells.push([r, c]);
+        }
+    }
+    shuffle(cells);
+
+    let toRemove = CELL_COUNT - clues;
+    for (const [r, c] of cells) {
+        if (toRemove <= 0) break;
+        
+        const backup = puzzle[r][c];
+        puzzle[r][c] = 0;
+        
+        // 一意性をチェック
+        const check = JSON.parse(JSON.stringify(puzzle));
+        if (countSolutions(check) !== 1) {
+            puzzle[r][c] = backup;
+        } else {
+            toRemove--;
+        }
+    }
+    return puzzle;
+}
+
+// ============================================================
+// タイマー機能
+// ============================================================
+
+function startTimer() {
+    clearInterval(timerInterval);
+    seconds = 0;
+    timerInterval = setInterval(() => {
+        seconds++;
+        const min = String(Math.floor(seconds / 60)).padStart(2, '0');
+        const sec = String(seconds % 60).padStart(2, '0');
+        timeElement.textContent = `${min}:${sec}`;
+    }, 1000);
+}
+
+function stopTimer() {
+    clearInterval(timerInterval);
+}
+
+function resetStats() {
+    stopTimer();
+    seconds = 0;
+    timeElement.textContent = "00:00";
+}
+
+// ============================================================
+// UI 描画と操作
+// ============================================================
+
+function renderCell(cellElement) {
+    const value = parseInt(cellElement.dataset.value || "0");
+    const memos = (cellElement.dataset.memos || "").split(',').filter(m => m !== '').map(Number);
+    
+    cellElement.innerHTML = '';
+    
+    if (value !== 0) {
+        // 数字が入力されている場合
+        cellElement.classList.remove('memo-mode');
+        const span = document.createElement('span');
+        span.className = 'main-number';
+        span.textContent = value;
+        cellElement.appendChild(span);
+    } else if (memos.length > 0) {
+        // メモが入力されている場合
+        cellElement.classList.add('memo-mode');
+        const memoContainer = document.createElement('div');
+        memoContainer.classList.add('memo-container');
+        
+        for (let i = 1; i <= SIZE; i++) {
+            const span = document.createElement('span');
+            if (memos.includes(i)) {
+                span.textContent = i;
+            }
+            memoContainer.appendChild(span);
+        }
+        cellElement.appendChild(memoContainer);
+    } else {
+        // 空のセル
+        cellElement.classList.remove('memo-mode');
+        cellElement.innerHTML = '';
+    }
+}
+
+function initGrid() {
+    gridElement.innerHTML = "";
+    
+    for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+            const cell = document.createElement("div");
+            cell.classList.add("cell");
+            cell.dataset.r = r;
+            cell.dataset.c = c;
+            cell.dataset.value = "0";
+            cell.dataset.memos = "";
+            
+            cell.addEventListener('click', () => selectCell(cell));
+            gridElement.appendChild(cell);
+        }
+    }
+}
+
+function loadPuzzle(pzl) {
+    initialPuzzle = JSON.parse(JSON.stringify(pzl));
+    
+    for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+            const cell = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+            const value = pzl[r][c];
+
+            cell.classList.remove('fixed', 'error');
+            cell.dataset.value = value.toString();
+            cell.dataset.memos = "";
+            
+            if (value !== 0) {
+                cell.classList.add("fixed");
+            } else {
+                cell.classList.remove("fixed");
+            }
+            
+            renderCell(cell);
+        }
+    }
+    
+    clearSelection();
+    clearHighlighting();
+    resetStats();
+    startTimer();
+    history = [];
+}
+
+function selectCell(cell) {
+    if (selectedCell === cell) {
+        clearSelection();
+        return;
+    }
+    
+    clearSelection();
+    selectedCell = cell;
+    selectedCell.classList.add('selected');
+    highlightRelatedCells(selectedCell.dataset.r, selectedCell.dataset.c);
+}
+
+function clearSelection() {
+    if (selectedCell) {
+        selectedCell.classList.remove('selected');
+        selectedCell = null;
+    }
+    clearHighlighting();
+}
+
+function highlightRelatedCells(r, c) {
+    clearHighlighting();
+    const br = Math.floor(r / 3) * 3;
+    const bc = Math.floor(c / 3) * 3;
+
+    document.querySelectorAll('.cell').forEach(cell => {
+        const cellR = parseInt(cell.dataset.r);
+        const cellC = parseInt(cell.dataset.c);
+        const cellBr = Math.floor(cellR / 3) * 3;
+        const cellBc = Math.floor(cellC / 3) * 3;
+
+        if (cellR == r || cellC == c || (cellBr == br && cellBc == bc)) {
+            cell.classList.add('highlighted');
+        }
+    });
+}
+
+function clearHighlighting() {
+    document.querySelectorAll('.cell').forEach(cell => {
+        cell.classList.remove('highlighted');
+    });
+}
+
+function checkAndHighlightErrors() {
+    const currentValues = getGridValuesFromCells();
+    document.querySelectorAll('.cell').forEach(cell => cell.classList.remove('error'));
+    
+    let hasError = false;
+
+    for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+            const val = currentValues[r][c];
+            if (val !== 0) {
+                const cellElement = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+                const isValidMove = isValid(currentValues, r, c, val);
+                
+                if (!isValidMove) {
+                    cellElement.classList.add('error');
+                    hasError = true;
+                }
+            }
+        }
+    }
+    return hasError;
+}
+
+function checkWinCondition() {
+    const currentValues = getGridValuesFromCells();
+    const isFull = currentValues.flat().every(val => val !== 0);
+    const hasError = checkAndHighlightErrors(); 
+
+    if (isFull && !hasError) {
+        stopTimer();
+        const min = String(Math.floor(seconds / 60)).padStart(2, '0');
+        const sec = String(seconds % 60).padStart(2, '0');
+        setTimeout(() => {
+            alert(`🎉 パズルクリア！おめでとうございます！\n⏱️ クリア時間: ${min}:${sec}`);
+        }, 100);
+        return true;
+    }
+    return false;
+}
+
+// ============================================================
+// キーパッド操作
+// ============================================================
+
+function toggleMemoMode() {
+    isMemoMode = !isMemoMode;
+    memoToggleButton.classList.toggle('memo-mode-active', isMemoMode);
+    memoToggleButton.innerHTML = isMemoMode ? "メモ<br>(ON)" : "メモ<br>(OFF)";
+}
+
+function handleKeypadInput(num) {
+    if (!selectedCell || selectedCell.classList.contains('fixed')) return;
+
+    saveStateToHistory();
+
+    const r = parseInt(selectedCell.dataset.r);
+    const c = parseInt(selectedCell.dataset.c);
+    const oldValue = parseInt(selectedCell.dataset.value || "0");
+    const oldMemos = selectedCell.dataset.memos;
+    
+    if (isMemoMode) {
+        // メモモード
+        if (oldValue !== 0) return;
+
+        let memos = (oldMemos || "").split(',').filter(m => m !== '').map(Number);
+        const numIndex = memos.indexOf(num);
+        
+        if (num === 0) {
+            // メモを全削除
+            selectedCell.dataset.memos = "";
+        } else if (numIndex > -1) {
+            // 既存のメモを削除
+            memos.splice(numIndex, 1);
+            selectedCell.dataset.memos = memos.sort((a, b) => a - b).join(',');
+        } else {
+            // 新しいメモを追加
+            memos.push(num);
+            selectedCell.dataset.memos = memos.sort((a, b) => a - b).join(',');
+        }
+    } else {
+        // 通常モード
+        selectedCell.dataset.memos = "";
+
+        if (num === 0) {
+            selectedCell.dataset.value = "0";
+        } else {
+            selectedCell.dataset.value = num.toString();
+        }
+    }
+    
+    renderCell(selectedCell);
+    checkAndHighlightErrors();
+    checkWinCondition();
+}
+
+// ============================================================
+// Undo機能
+// ============================================================
+
+function saveStateToHistory() {
+    if (!selectedCell) return;
+
+    history.push({
+        r: parseInt(selectedCell.dataset.r),
+        c: parseInt(selectedCell.dataset.c),
+        value: selectedCell.dataset.value,
+        memos: selectedCell.dataset.memos,
+    });
+
+    if (history.length > MAX_HISTORY) {
+        history.shift();
+    }
+}
+
+function undo() {
+    if (history.length === 0) {
+        alert("これ以上戻る操作はありません。");
+        return;
+    }
+
+    const prevState = history.pop();
+    const cellToRestore = document.querySelector(`.cell[data-r="${prevState.r}"][data-c="${prevState.c}"]`);
+
+    if (cellToRestore && !cellToRestore.classList.contains('fixed')) {
+        cellToRestore.dataset.value = prevState.value;
+        cellToRestore.dataset.memos = prevState.memos;
+
+        renderCell(cellToRestore);
+        selectCell(cellToRestore);
+        checkAndHighlightErrors();
+    } else {
+        if (history.length > 0) undo();
+    }
+}
+
+// ============================================================
+// コントロールボタン操作
+// ============================================================
+
+function generatePuzzle() {
+    const clues = parseInt(document.getElementById("clues").value);
+    let pzl = generateSudoku(clues);
+    loadPuzzle(pzl);
+}
+
+function confirmGiveUp() {
+    const confirmation = confirm("答えを見ますか？\n「OK」で解答を表示し、ゲームを終了します。\n「キャンセル」でゲームに戻ります。");
+    
+    if (confirmation) {
+        solvePuzzle();
+    }
+}
+
+function solvePuzzle() {
+    for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+            const cell = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+            if (!cell.classList.contains('fixed')) {
+                cell.dataset.value = solutionGrid[r][c].toString();
+                cell.dataset.memos = "";
+            }
+        }
+    }
+    
+    document.querySelectorAll('.cell').forEach(cell => cell.classList.remove('error'));
+    document.querySelectorAll('.cell').forEach(renderCell);
+    stopTimer();
+    
+    setTimeout(() => {
+        alert("🏳️ ギブアップ！解答を表示しました。");
+    }, 100);
+    
+    history = [];
+    clearSelection();
+}
+
+function resetPuzzle() {
+    if (!initialPuzzle || initialPuzzle.length === 0) {
+        alert("最初にパズルを生成してください。");
+        return;
+    }
+    
+    const confirmation = confirm("パズルを最初からやり直しますか？");
+    if (!confirmation) return;
+    
+    for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+            const cell = document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+            if (!cell.classList.contains('fixed')) {
+                cell.dataset.value = "0";
+                cell.dataset.memos = "";
+            }
+        }
+    }
+    
+    document.querySelectorAll('.cell').forEach(cell => cell.classList.remove('error'));
+    document.querySelectorAll('.cell').forEach(renderCell);
+    
+    resetStats();
+    startTimer();
+    
+    history = [];
+    clearSelection();
+}
+
+// ============================================================
+// キーボード操作のサポート
+// ============================================================
+
+document.addEventListener('keydown', (e) => {
+    if (!selectedCell) return;
+    
+    const key = e.key;
+    
+    // 数字キー (1-9)
+    if (key >= '1' && key <= '9') {
+        e.preventDefault();
+        handleKeypadInput(parseInt(key));
+    }
+    // Deleteキー、Backspaceキー、0キー
+    else if (key === 'Delete' || key === 'Backspace' || key === '0') {
+        e.preventDefault();
+        handleKeypadInput(0);
+    }
+    // 矢印キーでセル移動
+    else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)) {
+        e.preventDefault();
+        const r = parseInt(selectedCell.dataset.r);
+        const c = parseInt(selectedCell.dataset.c);
+        
+        let newR = r;
+        let newC = c;
+        
+        if (key === 'ArrowUp' && r > 0) newR = r - 1;
+        if (key === 'ArrowDown' && r < SIZE - 1) newR = r + 1;
+        if (key === 'ArrowLeft' && c > 0) newC = c - 1;
+        if (key === 'ArrowRight' && c < SIZE - 1) newC = c + 1;
+        
+        const newCell = document.querySelector(`.cell[data-r="${newR}"][data-c="${newC}"]`);
+        if (newCell) selectCell(newCell);
+    }
+    // Mキーでメモモード切り替え
+    else if (key === 'm' || key === 'M') {
+        e.preventDefault();
+        toggleMemoMode();
+    }
+    // Zキーで元に戻す (Ctrl+Z または Cmd+Z)
+    else if ((e.ctrlKey || e.metaKey) && key === 'z') {
+        e.preventDefault();
+        undo();
+    }
+});
+
+// ============================================================
+// 初期設定
+// ============================================================
+initGrid();
+generatePuzzle();
+</script>
+
+</body>
+</html>
